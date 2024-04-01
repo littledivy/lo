@@ -6,6 +6,11 @@
 #include "main.h"
 #endif
 
+#define USE_V8
+/* #define USE_QUICKJS */
+
+#ifdef USE_V8
+
 using v8::V8;
 using v8::Platform;
 
@@ -23,7 +28,43 @@ bool EntropySource(unsigned char* buffer, size_t length) {
   return true;
 }
 
+#endif
+
+#ifdef USE_QUICKJS
+#include "quickjs/quickjs.h"
+#endif
+
 int main(int argc, char** argv) {
+#ifdef USE_QUICKJS
+  if (argc == 1) {
+    fprintf(stdout, "%s %s\nquickjs %s\n", RUNTIME, VERSION, 
+      JS_GetVersion());
+    return 0;
+  }
+
+  JSRuntime* rt = JS_NewRuntime();
+  JSContext* ctx = JS_NewContext(rt);
+
+  // quickjs expects a null-terminated C string
+  char* js_cstr = (char*)malloc(main_js_len + 1);
+  memcpy(js_cstr, main_js, main_js_len);
+  js_cstr[main_js_len] = '\0';
+
+  JSValue val = JS_Eval(ctx, js_cstr, main_js_len, "<eval>", JS_EVAL_TYPE_MODULE);
+  if (JS_IsException(val)) {
+    JSValue e = JS_GetException(ctx);
+    fprintf(stderr, "Exception: %s\n", JS_ToCString(ctx, e));
+    JS_FreeValue(ctx, e);
+  }
+
+  // todo: rename
+  if (_v8_cleanup) {
+    JS_FreeValue(ctx, val);
+    JS_FreeContext(ctx);
+    JS_FreeRuntime(rt);
+  }
+#endif
+#ifdef USE_V8
   // if we are called with no arguments, just dump the version and exit
   if (argc == 1) {
     fprintf(stdout, "%s %s\nv8 %s\n", RUNTIME, VERSION, v8::V8::GetVersion());
@@ -32,6 +73,7 @@ int main(int argc, char** argv) {
   // record the start time - this will be made available to JS so we can 
   // measure time to bootstrap the runtime
   uint64_t starttime = lo::hrtime();
+
   // turn off buffering of stdout and stderr - this is required by V8
   // https://en.cppreference.com/w/c/io/setvbuf
   setvbuf(stdout, nullptr, _IONBF, 0);
@@ -68,5 +110,6 @@ int main(int argc, char** argv) {
     V8::Dispose();
     platform.reset();
   }
+#endif
   return 0;
 }

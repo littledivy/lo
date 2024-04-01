@@ -4,6 +4,9 @@
 
 #include "lo.h"
 
+#ifdef USE_V8
+#endif
+
 extern char _binary_main_js_start[];
 extern char _binary_main_js_end[];
 static unsigned int main_js_len = _binary_main_js_end - _binary_main_js_start;

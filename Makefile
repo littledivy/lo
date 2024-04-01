@@ -3,7 +3,8 @@ CC=clang++
 LARGS=-rdynamic -pthread
 CCARGS=-std=c++17 -c -fno-omit-frame-pointer -fno-rtti -fno-exceptions
 CARGS=-c -fno-omit-frame-pointer
-WARN=-Werror -Wpedantic -Wall -Wextra -Wno-unused-parameter
+WARN=-Werror -Wall -Wextra -Wno-unused-parameter
+# -Wpedantic doesn't work with quickjs
 OPT=-O3
 VERSION=0.0.13-pre
 V8_VERSION=1.0.0
@@ -63,6 +64,9 @@ v8/v8_monolith.lib: ## download the v8 static library for windows
 	curl -L -o v8/v8_monolith.lib.gz https://github.com/just-js/v8/releases/download/${V8_VERSION}/libv8_monolith-${os}-${ARCH}.lib.gz
 	gzip -d v8/v8_monolith.lib.gz
 
+quickjs.a: ## build quickjs static library
+	make -C quickjs
+
 main.o: ## compile the main.cc object file
 	$(CC) ${CCARGS} ${OPT} -DRUNTIME='"${RUNTIME}"' -DVERSION='"${VERSION}"' -I./v8 -I./v8/include ${WARN} ${V8_FLAGS} main.cc
 
@@ -76,9 +80,9 @@ endif
 ${RUNTIME}.o: ## compile runtime into an object file 
 	$(CC) ${CCARGS} ${OPT} -DRUNTIME='"${RUNTIME}"' -DVERSION='"${VERSION}"' ${V8_FLAGS} -I./v8 -I./v8/include ${WARN} ${RUNTIME}.cc
 
-${RUNTIME}: v8/include v8/libv8_monolith.a main.js ${BINDINGS} builtins.o main.o ${RUNTIME}.o ## link the runtime for linux/macos
+${RUNTIME}: quickjs.a v8/include v8/libv8_monolith.a main.js ${BINDINGS} builtins.o main.o ${RUNTIME}.o ## link the runtime for linux/macos
 	@echo building ${RUNTIME} for ${os} on ${ARCH}
-	$(CC) $(LARGS) ${OPT} main.o ${RUNTIME}.o builtins.o ${BINDINGS} v8/libv8_monolith.a ${LIBS} -o ${TARGET}
+	$(CC) $(LARGS) ${OPT} main.o ${RUNTIME}.o builtins.o ${BINDINGS} v8/libv8_monolith.a quickjs/build/libqjs.a  ${LIBS} -o ${TARGET}
 
 ${RUNTIME}.exe: v8/include v8/v8_monolith.lib main.js ## link the runtime for windows
 	cl /EHsc /std:c++17 /DRUNTIME='"${RUNTIME}"' /DVERSION='"${VERSION}"' /I./v8 /I./v8/include /c main.cc
